@@ -1,0 +1,59 @@
+name: Build AzaharPlus Custom Title APK
+
+on:
+  push:
+    branches:
+      - azaharplus-custom-title
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout build scripts
+        uses: actions/checkout@v4
+
+      - name: Clone AzaharPlus 2126.1-B
+        run: |
+          git clone --recursive --branch AZAHAR_PLUS_2126_1_B https://github.com/AzaharPlus/AzaharPlus.git AzaharPlus
+
+      - name: Apply custom title patch
+        run: |
+          python3 azaharplus-custom/patch_azaharplus.py AzaharPlus
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ccache apksigner
+
+      - name: Install Android CMake and NDK
+        run: |
+          yes | "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" "cmake;3.30.3" "ndk;27.3.13750724"
+
+      - name: Build signed release APK
+        working-directory: AzaharPlus
+        run: |
+          chmod +x ./.ci/android.sh
+          JAVA_HOME="${JAVA_HOME_17_X64}" ./.ci/android.sh
+
+      - name: Collect APK
+        run: |
+          mkdir -p output
+          APK="$(find AzaharPlus/src/android/app/build/outputs/apk -type f -name '*.apk' | grep -E '/vanilla/release/' | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "Release APK not found. Available APKs:"
+            find AzaharPlus/src/android/app/build/outputs/apk -type f -name '*.apk' -print || true
+            exit 1
+          fi
+          cp "$APK" output/AzaharPlus-CustomTitle-2126.1-B.apk
+          apksigner verify --verbose output/AzaharPlus-CustomTitle-2126.1-B.apk
+          sha256sum output/AzaharPlus-CustomTitle-2126.1-B.apk | tee output/SHA256.txt
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AzaharPlus-CustomTitle-2126.1-B
+          path: output/
+          if-no-files-found: error
