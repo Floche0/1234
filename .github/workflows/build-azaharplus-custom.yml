@@ -1,9 +1,9 @@
-name: Build AzaharPlus Custom Title APK
+name: Build AzaharPlus Custom Title + Thor Framegen APK
 
 on:
   push:
     branches:
-      - azaharplus-custom-title
+      - azaharplus-custom-title-framegen
   workflow_dispatch:
 
 jobs:
@@ -19,9 +19,34 @@ jobs:
         run: |
           git clone --recursive --branch AZAHAR_PLUS_2126_1_B https://github.com/AzaharPlus/AzaharPlus.git AzaharPlus
 
-      - name: Apply custom title patch
+      - name: Merge Thor framegen patch set
+        working-directory: AzaharPlus
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git remote add thor https://github.com/slushiimusic/Azahar-Thor-Framegen.git
+          git fetch thor thor-framegen
+          git cherry-pick             7a2cd280b1563802bf2237ced90cc2083c9f3464             62ca3dbb2d61beef2d6d63c375df559f8cccdd7f             264aa6eb362ab4304b4034203aab830fccb79bdc             14c7fdc591f5547e445f7a8cd8d63d977f4f9705             25f408c6610a995afefc64c5109b8dccce96e787
+
+      - name: Bundle Thor LSFG native library
+        run: |
+          curl -L --fail             https://github.com/slushiimusic/Azahar-Thor-Framegen/releases/download/2126.0-thor/AzaharThor-2126.0-framegen.apk             -o thor-framegen.apk
+          mkdir -p AzaharPlus/src/android/app/src/main/jniLibs/arm64-v8a
+          unzip -j thor-framegen.apk             'lib/arm64-v8a/liblsfg-android.so'             -d AzaharPlus/src/android/app/src/main/jniLibs/arm64-v8a
+          test -s AzaharPlus/src/android/app/src/main/jniLibs/arm64-v8a/liblsfg-android.so
+          sha256sum AzaharPlus/src/android/app/src/main/jniLibs/arm64-v8a/liblsfg-android.so
+
+      - name: Apply custom title and package patch
         run: |
           python3 azaharplus-custom/patch_azaharplus.py AzaharPlus
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("AzaharPlus/src/android/app/build.gradle.kts")
+          s = p.read_text()
+          s = s.replace('val abiFilter = listOf("arm64-v8a", "x86_64")',
+                        'val abiFilter = listOf("arm64-v8a")')
+          p.write_text(s)
+          PY
 
       - name: Install build dependencies
         run: |
@@ -30,30 +55,31 @@ jobs:
 
       - name: Install Android CMake and NDK
         run: |
-          yes | "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" "cmake;3.30.3" "ndk;27.3.13750724"
+          yes | "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"             "cmake;3.30.3" "ndk;27.3.13750724"
 
-      - name: Build vanilla release APK only
+      - name: Build vanilla release APK
         working-directory: AzaharPlus/src/android
         run: |
           chmod +x ./gradlew
           JAVA_HOME="${JAVA_HOME_17_X64}" ./gradlew assembleVanillaRelease --no-daemon
 
+      - name: Verify APK contents
+        run: |
+          APK="$(find AzaharPlus/src/android/app/build/outputs/apk -type f -name '*.apk' | grep -E '/vanilla/release/' | head -n 1)"
+          test -n "$APK"
+          unzip -l "$APK" | grep 'lib/arm64-v8a/liblsfg-android.so'
+          apksigner verify --verbose "$APK"
+
       - name: Collect APK
         run: |
           mkdir -p output
           APK="$(find AzaharPlus/src/android/app/build/outputs/apk -type f -name '*.apk' | grep -E '/vanilla/release/' | head -n 1)"
-          if [ -z "$APK" ]; then
-            echo "Release APK not found. Available APKs:"
-            find AzaharPlus/src/android/app/build/outputs/apk -type f -name '*.apk' -print || true
-            exit 1
-          fi
-          cp "$APK" output/AzaharPlus-CustomTitle-2126.1-B.apk
-          apksigner verify --verbose output/AzaharPlus-CustomTitle-2126.1-B.apk
-          sha256sum output/AzaharPlus-CustomTitle-2126.1-B.apk | tee output/SHA256.txt
+          cp "$APK" output/AzaharPlus-CustomTitle-ThorFramegen-2126.1-B.apk
+          sha256sum output/AzaharPlus-CustomTitle-ThorFramegen-2126.1-B.apk | tee output/SHA256.txt
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AzaharPlus-CustomTitle-2126.1-B
+          name: AzaharPlus-CustomTitle-ThorFramegen-2126.1-B
           path: output/
           if-no-files-found: error
