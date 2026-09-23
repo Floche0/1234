@@ -60,7 +60,7 @@ replacement = '''        val aboutGameTitle = bottomSheetView.findViewById<TextV
 
             MaterialAlertDialogBuilder(context)
                 .setTitle("표시 이름 변경")
-                .setMessage("AzaharPlus Custom에서만 표시되는 이름입니다. ROM 파일은 변경되지 않습니다.")
+                .setMessage("AzaharPlus Custom Framegen에서만 표시되는 이름입니다. ROM 파일은 변경되지 않습니다.")
                 .setView(input)
                 .setPositiveButton(android.R.string.ok) { _, _ ->
                     val customTitle = input.text.toString().trim()
@@ -116,10 +116,10 @@ layout.write_text(xml, encoding="utf-8")
 
 g = gradle.read_text(encoding="utf-8")
 needle = '        applicationId = "io.github.lime3ds.android"\n'
-replacement = '        applicationId = "io.github.floche0.azaharpluscustom"\n'
+replacement = '        applicationId = "io.github.floche0.azaharpluscustomfg"\n'
 if needle not in g:
     raise SystemExit("Could not find applicationId in build.gradle.kts")
 g = g.replace(needle, replacement, 1)
 gradle.write_text(g, encoding="utf-8")
 
-print("AzaharPlus custom title patch applied successfully.")
+print("AzaharPlus custom title + framegen package patch applied successfully.")
