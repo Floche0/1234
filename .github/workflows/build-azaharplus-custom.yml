@@ -32,11 +32,11 @@ jobs:
         run: |
           yes | "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" "cmake;3.30.3" "ndk;27.3.13750724"
 
-      - name: Build signed release APK
-        working-directory: AzaharPlus
+      - name: Build vanilla release APK only
+        working-directory: AzaharPlus/src/android
         run: |
-          chmod +x ./.ci/android.sh
-          JAVA_HOME="${JAVA_HOME_17_X64}" ./.ci/android.sh
+          chmod +x ./gradlew
+          JAVA_HOME="${JAVA_HOME_17_X64}" ./gradlew assembleVanillaRelease --no-daemon
 
       - name: Collect APK
         run: |
